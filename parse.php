@@ -62,6 +62,8 @@ function XMLize($scanner)
 		"dprint" => array("symbol"),
 		"break" => array());
 	$xml = new DOMDocument("1.0", "UTF-8");
+	$xml_program = $xml->createElement("program");
+	$xml_program->setAttribute("language", "IPPcode19");
 	$order = 1;
 
 	//check the first line for the .IPPcode19 header
@@ -130,7 +132,7 @@ function XMLize($scanner)
 			}
 			exit(23);
 		}
-		$xml->appendChild($xml_instruction);
+		$xml_program->appendChild($xml_instruction);
 		unset($expecting);
 		do
 		{
@@ -138,6 +140,7 @@ function XMLize($scanner)
 		} while($scanner->getTokenType() == "new_line");
 		$order++;
 	}
+	$xml->appendChild($xml_program);
 	print $xml->saveXML();
 }
 
