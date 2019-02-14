@@ -1,265 +1,186 @@
 <?php
 
-//class that represents tokens
-class Token
+include 'scan.php';
+
+//@brief checks if the token can be 'type'
+//@param $token_type token type returned by lexical analysis
+//@param $token token as string returned by lexical analysis
+//@return true if the token can be type, false otherwise
+function isType($token_type, $token)
 {
-	//all the possible instructions.
-	//Will increment every time the instruction gets used,
-	//so I could have usage statistics for each instructions separately,
-	//which I don't need, but I think it's cool
-	private $instructions = array(
-		"move" => 0,
-		"createframe" => 0,
-		"pushframe" => 0,
-		"popframe" => 0,
-		"defvar" => 0,
-		"call" => 0,
-		"return" => 0,
-		"pushs" => 0,
-		"pops" => 0,
-		"add" => 0,
-		"sub" => 0,
-		"mul" => 0,
-		"idiv" => 0,
-		"lt" => 0,
-		"gt" => 0,
-		"eq" => 0,
-		"and" => 0,
-		"or" => 0,
-		"not" => 0,
-		"int2char" => 0,
-		"stri2int" => 0,
-		"read" => 0,
-		"write" => 0,
-		"concat" => 0,
-		"strlen" => 0,
-		"getchar" => 0,
-		"setchar" => 0,
-		"type" => 0,
-		"label" => 0,
-		"jump" => 0,
-		"jumpifeq" => 0,
-		"jumpifneq" => 0,
-		"exit" => 0,
-		"dprint" => 0,
-		"break" => 0,
-	);
-	//the comments counter for the extension
-	private $comments = 0;
+	return $token_type == "label" &&
+		($token == "string" || $token == "int" || $token == "bool");
+}
 
-	//the raw string exactly like in the source code
-	private $token_string;
+//@brief checks if the token can be 'symbol'
+//@param $token_type token type returned by lexical analysis
+//@return true if the token can be symbol, false otherwise
+function isSymbol($token_type)
+{
+	return $token_type == "variable" || $token_type == "constant";
+}
 
-	//possible types:
-	//new_line
-	//EOF
-	//instruction
-	//variable
-	//constant
-	//label
-	//lexical_error
-	private $token_type;
+//@brief Takes IPPcode19 from stdin and outputs it as XML to stdout
+//@param $scanner instance of Lexical analyser
+function XMLize($scanner)
+{
+	//all of the instructions with all the operands they need
+	$instruction_operands = array(
+		"move" => array("variable", "symbol"),
+		"createframe" => array(),
+		"pushframe" => array(),
+		"popframe" => array(),
+		"defvar" => array("variable"),
+		"call" => array("label"),
+		"return" => array(),
+		"pushs" => array("symbol"),
+		"pops" => array("variable"),
+		"add" => array("variable", "symbol", "symbol"),
+		"sub" => array("variable", "symbol", "symbol"),
+		"mul" => array("variable", "symbol", "symbol"),
+		"idiv" => array("variable", "symbol", "symbol"),
+		"lt" => array("variable", "symbol", "symbol"),
+		"gt" => array("variable", "symbol", "symbol"),
+		"eq" => array("variable", "symbol", "symbol"),
+		"and" => array("variable", "symbol", "symbol"),
+		"or" => array("variable", "symbol", "symbol"),
+		"not" => array("variable", "symbol", "symbol"),
+		"int2char" => array("variable", "symbol"),
+		"stri2int" => array("variable", "symbol", "symbol"),
+		"read" => array("variable", "type"),
+		"write" => array("symbol"),
+		"concat" => array("variable", "symbol", "symbol"),
+		"strlen" => array("variable", "symbol"),
+		"getchar" => array("variable", "symbol", "symbol"),
+		"setchar" => array("variable", "symbol", "symbol"),
+		"type" => array("variable", "symbol"),
+		"label" => array("label"),
+		"jump" => array("label"),
+		"jumpifeq" => array("label", "symbol", "symbol"),
+		"jumpifneq" => array("label", "symbol", "symbol"),
+		"exit" => array("symbol"),
+		"dprint" => array("symbol"),
+		"break" => array());
+	$xml = new DOMDocument("1.0", "UTF-8");
+	$order = 1;
 
-	//last char read from stdin, the char doesn't have to be part of token_string
-	//for example \n gets saved here, but not to the token_string
-	private $last_char;
+	//check the first line for the .IPPcode19 header
+	if($scanner->getToken() != ".IPPcode19")
+		exit(21);
 
-	public function __construct()
+	//remove all unnecessary preceding empty lines
+	do
 	{
-		$this->last_char = "";
-		$this->nextToken();
-	}
-	
-	public function getToken()
-	{
-		return $this->token_string;
-	}
+		$scanner->nextToken();
+	} while($scanner->getTokenType() == "new_line");
 
-	public function getTokenType()
+	while($scanner->getTokenType() != "EOF")
 	{
-		return $this->token_type;
-	}
-
-	//method that reads and lexicaly processes next token from the source code
-	public function nextToken()
-	{
-		//this processec new lines
-		if($this->last_char == "\n")
+		if($scanner->getTokenType() != "instruction")
 		{
-			$this->token_string = "\n";
-			$this->token_type = "new_line";
-			$this->last_char = "";
-			return;
+			exit(23);
 		}
 
-		$this->token_string = "";
+		//create the instruction element
+		$xml_instruction = $xml->createElement("instruction");
+		$xml_instruction->setAttribute("order", $order);
+		$xml_instruction->setAttribute("opcode", strtoupper($scanner->getToken()));
+
+		$instruction = strtolower($scanner->getToken());
+		$arg_count = 1;
+
+		//check the instruction arguments - syntactic analysis
+		foreach($instruction_operands[$instruction] as $expecting)
+		{
+			$scanner->nextToken();
+			$xml_argument = $xml->createElement("arg" . $arg_count);
+			$arg_count++;
+
+			if($expecting == "type" && 
+				isType($scanner->getTokenType(), $scanner->getToken()))
+			{
+				$xml_argument->setAttribute("type", "type");
+				$xml_argument->nodeValue = $scanner->getToken();
+				$xml_instruction->appendChild($xml_argument);
+				continue;
+			}
+			if($expecting == "variable" && $scanner->getTokenType() == "variable")
+			{
+				$xml_argument->setAttribute("type", "var");
+				$xml_argument->nodeValue = $scanner->getToken();
+				$xml_instruction->appendChild($xml_argument);
+				continue;
+			}
+			if($expecting == "label" && $scanner->getTokenType() == "label")
+			{
+				$xml_argument->setAttribute("type", "label");
+				$xml_argument->nodeValue = $scanner->getToken();
+				$xml_instruction->appendChild($xml_argument);
+				continue;
+			}
+			if($expecting == "symbol" && isSymbol($scanner->getTokenType()))
+			{
+				if($scanner->getTokenType() == "variable")
+					$xml_argument->setAttribute("type", "var");
+				else
+					$xml_argument->setAttribute("type", $scanner->getPrefix());
+				$xml_argument->nodeValue = $scanner->getSufix();
+				$xml_instruction->appendChild($xml_argument);
+				continue;
+			}
+			exit(23);
+		}
+		$xml->appendChild($xml_instruction);
+		unset($expecting);
 		do
 		{
-			while(!ctype_space($character = fgetc(STDIN)))
-			{
-				//EOF check
-				if($character === false)
-				{
-					$this->token_type = "EOF";
-					$this->token_string = "EOF";
-					return;
-				}
-				//comment check
-				if($character == "#")
-				{
-					$this->processComment();
-					if($this->token_string == "")
-					{
-						$this->token_string = "\n";
-						$this->token_type = "new_line";
-						return;
-					}
-					else
-						break;
-				}
-				$this->token_string = $this->token_string . $character;
-			}
-			if($this->token_string != "")
-				$this->tokenCheck();
-			$this->last_char = $character;
-		} while($this->token_string == "");
+			$scanner->nextToken();
+		} while($scanner->getTokenType() == "new_line");
+		$order++;
 	}
-
-	//method for "eating" the comment, the output will be new line token,
-	//which is harmless for the rest of this script
-	private function processComment()
-	{
-		$character = "#";	
-		while($character != "\n" && $character !== false)
-			$character = fgetc(STDIN);
-		$this->comments++;
-		$this->last_char = "\n";
-	}
-
-	//method which checks and assigns token type
-	private function tokenCheck()
-	{
-		if($this->token_type == "new_line")
-		{
-			if($this->isInstruction())
-			{
-				$this->token_type = "instruction";
-			}
-			else
-			{
-				$this->token_type = "lexical_error";
-				echo "150";
-				exit(22);
-			}
-		}
-		else if($position = strpos($this->token_string, "@"))
-		{
-			$frames = array("GF", "LF", "TF");
-			$var_types = array("string", "int", "bool", "nil");
-			$prefix = substr($this->token_string, 0, $position);
-			$sufix = substr($this->token_string, $position + 1);
-
-			var_dump($prefix);
-			var_dump($sufix);
-			if(in_array($prefix, $frames) && $this->isVariable($sufix))
-			{
-				$this->token_type = "variable";
-			}
-			else if(in_array($prefix, $var_types))
-			{
-				//php magic - calls method according to prefix
-				//eg. $this->isBool();
-				echo "is" . ucfirst($prefix);
-				if($this->{"is" . ucfirst($prefix)}($sufix))
-				{
-					$this->token_type = "constant";
-				}
-				else
-				{
-					$this->token_type = "lexical_error";
-					echo "179";
-					exit(22);
-				}
-			}
-			else
-			{
-				$this->token_type = "lexical_error";
-				echo "186";
-				exit(22);
-			}
-		}
-		else
-			$this->token_type = "other";
-	}
-
-	//method which checkes if the token is correctly writen instruction
-	private function isInstruction()
-	{
-		if(array_key_exists(strtolower($this->token_string), $this->instructions))
-		{
-			$this->instructions[strtolower($this->token_string)]++;
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-
-	//mathod which checks if the token is a correctly writen variable
-	private function isVariable($name)
-	{
-		//begins with letter or one of _$&%*!?- and continues
-		//with letters or _$&%*!?- or numbers
-		if(preg_match('/^[A-Za-z_$&%*!?-][A-Za-z0-9_$&%*!?-]*$/', $name) == 1)
-			return true;
-		else
-			return false;
-	}
-
-	private function isBool($value)
-	{
-		if($value == "true" || $value == "false")
-			return true;
-		else
-			return false;
-	}
-
-	private function isNul($value)
-	{
-		if($value == "nul")
-			return true;
-		else
-			return false;
-	}
-
-	private function isString($value)
-	{
-		echo "inhere";
-		//check escape sequences
-		for($i = 0; ($pos = strpos("\\", substr($value, $i))) !== false; $i = $pos + 4)
-		{
-			if(!preg_match("/^[0-9]{3}$/", substr($value, $pos + 1, 3)))
-				return false;
-		}
-		return true;
-	}
-
-	private function isInt($value)
-	{
-		if(preg_match('/^[0-9]*$/', $value) == 1)
-			return true;
-		else
-			return false;
-	}
+	print $xml->saveXML();
 }
 
-$token = new Token();
-
-while($token->getTokenType() != "EOF")
+//@brief prints the help
+//@param $argc the argc variable so the function can check if "help" is the only arg.
+function help($argc)
 {
-	echo $token->getToken() . "    " . $token->getTokenType() . "\n";
-	$token->nextToken();
+	if($argc != 2)
+		exit(10);
+	print "Script typu filtr nacte ze standardniho vstup zdrojovy kod v IPPcode19, ".
+		"zkontroluje lexikalni a syntaktickou spravnost kodu a vypise na " .
+		"na standardni vystup XML reprezentaci programu dle specifikace.\n";
+	exit(0);
 }
 
+$scanner = new LexicalAnalyser();
+
+//all the possible command line arguments
+$possible_args = array(
+	"stats:",
+	"loc",
+	"comments",
+	"labels",
+	"jumps",
+	"help"
+);
+
+//parse command line args
+$options = getopt("", $possible_args);
+if($options === false)
+	exit(10);
+
+if(array_key_exists("help", $options))
+	help($argc);
+
+//checks if a filename was given along with the stats option
+if(in_array("--stats", $argv) && !array_key_exists("stats", $options))
+	exit(10); //missing file
+
+XMLize($scanner);
+
+if(array_key_exists("stats", $options))
+{
+	$scanner->printStats($options["stats"], $options);
+}
 ?>
