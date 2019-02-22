@@ -44,7 +44,7 @@ function XMLize($scanner)
 		"eq" => array("variable", "symbol", "symbol"),
 		"and" => array("variable", "symbol", "symbol"),
 		"or" => array("variable", "symbol", "symbol"),
-		"not" => array("variable", "symbol", "symbol"),
+		"not" => array("variable", "symbol"),
 		"int2char" => array("variable", "symbol"),
 		"stri2int" => array("variable", "symbol", "symbol"),
 		"read" => array("variable", "type"),
@@ -123,10 +123,15 @@ function XMLize($scanner)
 			if($expecting == "symbol" && isSymbol($scanner->getTokenType()))
 			{
 				if($scanner->getTokenType() == "variable")
+				{
 					$xml_argument->setAttribute("type", "var");
+					$xml_argument->nodeValue = $scanner->getToken();
+				}
 				else
-					$xml_argument->setAttribute("type", $scanner->getPrefix());
-				$xml_argument->nodeValue = $scanner->getSufix();
+				{
+					$xml_argument->setAttribute("type", $scanner->getPrefix());			
+					$xml_argument->nodeValue = $scanner->getSufix();
+				}
 				$xml_instruction->appendChild($xml_argument);
 				continue;
 			}
