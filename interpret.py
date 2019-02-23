@@ -724,7 +724,7 @@ def write(arguments):
             exit(56)
         dest_type, dest = get_symbol(dest)
     
-    print(dest, end=' ')
+    print(dest, end='')
     
 #executes the concat instruction: CONCAT var symb symb
 def concat(arguments):
@@ -1001,8 +1001,6 @@ def main():
     #        print(cc)
     source_file.close()
     input_file.close()
-    print(symbol_table)
-    print(frame_stack)
 
 
 if __name__ == "__main__":
