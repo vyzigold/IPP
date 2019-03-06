@@ -49,7 +49,7 @@ def make_label(arguments, location):
         exit(53)
     if var in symbol_table["label"]:
         exit(52)
-    symbol_table["label"][var] = location
+    symbol_table["label"][var] = int(location)
 
 #returns the code as {'order': ['opcode', [arg1, arg2, ...]], ...},
 #where arg = (type, value)
@@ -138,16 +138,19 @@ def process_at(var):
 #checks if the symbol is defined in symbol_table
 def is_defined(prefix, sufix):
     if prefix not in symbol_table:
-        return False
+        return 55
 
     if sufix not in symbol_table[prefix]:
-        return False
+        print("AA")
+        return 54
+    return 0
 
 #returns value from symbol table and also does all the checks for it's existence
 def get_symbol(symbol):
     prefix, sufix = process_at(symbol)
-    if is_defined(prefix, sufix) == False:
-        exit(54)
+    ret_val = is_defined(prefix, sufix)
+    if ret_val != 0:
+        exit(ret_val)
     value = symbol_table[prefix][sufix]
     if value == None:
         exit(56)
@@ -162,10 +165,10 @@ def defvar(arguments):
     prefix, sufix = process_at(var)
 
     if arg_type != "var":
-        exit(53)
+        exit(32)
 
     if prefix not in symbol_table:
-        exit(54)
+        exit(55)
 
     symbol_table[prefix][sufix] = None
 
@@ -178,15 +181,15 @@ def move(arguments):
     source_type, source = arguments[1]
 
     if dest_type != "var":
-        exit(53)
+        exit(32)
 
     if source_type != "var" and not is_const(source_type):
-        exit(53)
+        exit(32)
 
     dest_prefix, dest_sufix = process_at(dest)
-
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if source_type == "var":
         variable = get_symbol(source)
@@ -230,7 +233,7 @@ def call(arguments):
     
     arg_type, var = arguments[0]
     if arg_type != "label":
-        exit(53)
+        exit(32)
 
     if var not in symbol_table["label"]:
         exit(52)
@@ -244,7 +247,7 @@ def return_instruction(arguments):
     if len(arguments) != 0:
         exit(52)
     
-    if len(call_stack):
+    if len(call_stack) == 0:
         exit(56)
     
     global instruction_pointer
@@ -258,7 +261,7 @@ def pushs(arguments):
     var_type, var = arguments[0]
     
     if var_type != "var" and not is_const(var_type):
-        exit(53)
+        exit(32)
 
     if var_type == "var":
         variable = get_symbol(var)
@@ -277,12 +280,12 @@ def pops(arguments):
     var_type, var = arguments[0]
 
     if var_type != "var":
-        exit(53)
+        exit(32)
 
     prefix, sufix = process_at(var)
-
-    if is_defined(prefix, sufix) == False:
-        exit(54)
+    ret_val = is_defined(prefix, sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     symbol_table[prefix][sufix] = var_stack.pop()
 
@@ -298,10 +301,10 @@ def add(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -326,10 +329,11 @@ def sub(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
+        exit(32)
 
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -354,10 +358,11 @@ def mul(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -382,10 +387,11 @@ def idiv(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -413,10 +419,11 @@ def lt(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -455,10 +462,11 @@ def gt(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -497,10 +505,11 @@ def eq(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -534,10 +543,11 @@ def and_instruction(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -566,10 +576,11 @@ def or_instruction(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -597,10 +608,11 @@ def not_instruction(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -625,10 +637,11 @@ def int2char(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -639,6 +652,7 @@ def int2char(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("string", chr(int(arg1)))
     except:
+        print("inttochar")
         exit(58)
 
 #executes the stri2int instruction: STRI2INT var symb symb
@@ -653,10 +667,11 @@ def stri2int(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -670,6 +685,7 @@ def stri2int(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("int", ord(arg1[int(arg2)]))
     except:
+        print("stritoint")
         exit(58)
     
 #executes the read instruction: READ var type
@@ -683,10 +699,11 @@ def read(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+        
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type != "type":
         exit(53)
@@ -724,6 +741,14 @@ def write(arguments):
             exit(56)
         dest_type, dest = get_symbol(dest)
     
+    #replace escape sequences
+    if dest_type == "string":
+        substrings = dest.split("\\")
+        for i, sub in enumerate(substrings):
+            if i == 0:
+                dest = sub
+            else:
+                dest = dest + chr(int(sub[0:3])) + sub[3:]
     print(dest, end='')
     
 #executes the concat instruction: CONCAT var symb symb
@@ -738,10 +763,11 @@ def concat(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+        
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -765,10 +791,11 @@ def strlen(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+        
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -790,10 +817,11 @@ def getchar(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
+        exit(32)
     
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
         arg1_type, arg1 = get_symbol(arg1)
@@ -807,6 +835,7 @@ def getchar(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("string", arg1[int(arg2)])
     except:
+        print("getchar")
         exit(58)
 
 #executes the setchar instruction: SETCHAR var symb symb
@@ -821,10 +850,11 @@ def setchar(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
-    
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+        exit(32)
+        
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     dest_type, dest = get_symbol(dest)
 
@@ -837,12 +867,14 @@ def setchar(arguments):
     if arg1_type != "int" or arg2_type != "string" or dest_type != "string":
         exit(53)
 
-    if len(arg2) != 1:
+    if len(arg2) < 1:
+        print("setchar1")
         exit(58)
 
     try:
-        dest = dest[:int(arg1)] + arg2 + dest[int(arg1) + 1:]
+        dest = dest[:int(arg1)] + arg2[0:1] + dest[int(arg1) + 1:]
     except:
+        print("setchar2")
         exit(58)
 
     symbol_table[dest_prefix][dest_sufix] = ("string", dest)
@@ -862,15 +894,17 @@ def type_instruction(arguments):
     dest_prefix, dest_sufix = process_at(dest)
     
     if dest_type != "var":
-        exit(53)
+        exit(32)
     
-    if is_defined(dest_prefix, dest_sufix) == False:
-        exit(54)
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
 
     if arg1_type == "var":
-        prefix, sufix = process_at(symbol)
-        if is_defined(prefix, sufix) == False:
-            exit(54)
+        prefix, sufix = process_at(arg1)
+        ret_val = is_defined(prefix, sufix)
+        if ret_val != 0:
+            exit(ret_val)
         value = symbol_table[prefix][sufix]
         if value == None:
             arg1_type = ""
@@ -887,11 +921,12 @@ def jump(arguments):
     var_type, var = arguments[0]
     
     if var_type != "label":
-        exit(53)
+        exit(32)
     
     if var not in symbol_table["label"]:
         exit(52)
-
+    
+    global instruction_pointer
     instruction_pointer = symbol_table["label"][var]
 
 #executes the jumpifeq instruction: JUMPIFEQ label symb symb
@@ -904,7 +939,7 @@ def jumpifeq(arguments):
     arg2_type, arg2 = arguments[2]
 
     if dest_type != "label":
-        exit(53)
+        exit(32)
 
     if dest not in symbol_table["label"]:
         exit(52)
@@ -919,6 +954,7 @@ def jumpifeq(arguments):
         exit(53)
 
     if arg1 == arg2:
+        global instruction_pointer
         instruction_pointer = symbol_table["label"][dest]
 
 #executes the jumpifneq instruction: JUMPIFNEQ label symb symb
@@ -931,7 +967,7 @@ def jumpifneq(arguments):
     arg2_type, arg2 = arguments[2]
 
     if dest_type != "label":
-        exit(53)
+        exit(32)
 
     if dest not in symbol_table["label"]:
         exit(52)
@@ -946,6 +982,7 @@ def jumpifneq(arguments):
         exit(53)
 
     if arg1 != arg2:
+        global instruction_pointer
         instruction_pointer = symbol_table["label"][dest]
 
 #executes the exit instruction: EXIT symb

@@ -67,7 +67,7 @@ function XMLize($scanner)
 	$order = 1;
 
 	//check the first line for the .IPPcode19 header
-	if($scanner->getToken() != ".IPPcode19")
+	if(strtolower($scanner->getToken()) != ".ippcode19")
 		exit(21);
 
 	//remove all unnecessary preceding empty lines
@@ -80,6 +80,9 @@ function XMLize($scanner)
 	{
 		if($scanner->getTokenType() != "instruction")
 		{
+			echo($scanner->getToken());
+			echo($scanner->getTokenType());
+			echo("83");
 			exit(23);
 		}
 
@@ -130,11 +133,12 @@ function XMLize($scanner)
 				else
 				{
 					$xml_argument->setAttribute("type", $scanner->getPrefix());			
-					$xml_argument->nodeValue = $scanner->getSufix();
+					$xml_argument->nodeValue = htmlSpecialChars($scanner->getSufix());
 				}
 				$xml_instruction->appendChild($xml_argument);
 				continue;
 			}
+			echo("139");
 			exit(23);
 		}
 		$xml_program->appendChild($xml_instruction);

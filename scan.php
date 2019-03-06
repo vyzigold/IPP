@@ -76,7 +76,7 @@ class LexicalAnalyser
 	//@return token as a string
 	public function getToken()
 	{
-		return $this->token_string;
+		return htmlSpecialChars($this->token_string);
 	}
 
 	//@return type of token
@@ -105,6 +105,8 @@ class LexicalAnalyser
 				//EOF check
 				if($character === false)
 				{
+					if($this->token_string != "")
+						break;
 					$this->token_type = "EOF";
 					$this->token_string = "EOF";
 					return;
@@ -120,14 +122,26 @@ class LexicalAnalyser
 						return;
 					}
 					else
+					{
+						$this->last_char = "\n";
 						break;
+					}
 				}
 				$this->token_string = $this->token_string . $character;
 			}
 			if($this->token_string != "")
 				$this->tokenCheck();
-			$this->last_char = $character;
-		} while($this->token_string == "");
+			if($character != "#")
+				$this->last_char = $character;
+		} while($this->token_string == "" && $character != "\n");
+
+		if($this->token_string == "")
+		{
+			$this->token_string = "\n";
+			$this->token_type = "new_line";
+			$this->last_char = "";
+			return;
+		}
 	}
 
 	//@return prefix of constant (part before @)
@@ -297,11 +311,11 @@ class LexicalAnalyser
 			return false;
 	}
 
-	//@brief method which checks if token can be a Nul
+	//@brief method which checks if token can be a Nil
 	//@return true when the token is corect and false otherwise
-	private function isNul($value)
+	private function isNil($value)
 	{
-		if($value == "nul")
+		if($value == "nil")
 			return true;
 		else
 			return false;
@@ -326,7 +340,7 @@ class LexicalAnalyser
 	//@return true when the token is corect and false otherwise
 	private function isInt($value)
 	{
-		if(preg_match('/^[0-9]*$/', $value) == 1)
+		if(preg_match('/^[\+\-]?[0-9]*$/', $value) == 1)
 			return true;
 		else
 			return false;
