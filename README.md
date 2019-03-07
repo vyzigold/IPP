@@ -1,2 +1,0 @@
-# IPP
-IPP project

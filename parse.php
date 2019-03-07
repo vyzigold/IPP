@@ -80,9 +80,6 @@ function XMLize($scanner)
 	{
 		if($scanner->getTokenType() != "instruction")
 		{
-			echo($scanner->getToken());
-			echo($scanner->getTokenType());
-			echo("83");
 			exit(23);
 		}
 
@@ -138,7 +135,6 @@ function XMLize($scanner)
 				$xml_instruction->appendChild($xml_argument);
 				continue;
 			}
-			echo("139");
 			exit(23);
 		}
 		$xml_program->appendChild($xml_instruction);
@@ -165,7 +161,6 @@ function help($argc)
 	exit(0);
 }
 
-$scanner = new LexicalAnalyser();
 
 //all the possible command line arguments
 $possible_args = array(
@@ -189,6 +184,7 @@ if(array_key_exists("help", $options))
 if(in_array("--stats", $argv) && !array_key_exists("stats", $options))
 	exit(10); //missing file
 
+$scanner = new LexicalAnalyser();
 XMLize($scanner);
 
 if(array_key_exists("stats", $options))
