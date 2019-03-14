@@ -7,6 +7,14 @@ frame_stack = list()
 instruction_pointer = 1
 call_stack = list()
 var_stack = list()
+instruction_count = 0
+var_count = 0
+stats_file = None
+source_file = None
+input_file = None
+
+def arg_error(tpm):
+    exit(10)
 
 #Parses program arguments and returns the correct source and input file
 def get_inputs():
@@ -14,7 +22,13 @@ def get_inputs():
     argparser = argparse.ArgumentParser(description = "Interpret XML made from z IPPcode19")
     argparser.add_argument("--source", nargs=1, help="input XML file")
     argparser.add_argument("--input", nargs=1, help="file with inputs to the program")
+    argparser.add_argument("--stats", nargs=1, help="file to output the stats to")
+    argparser.add_argument("--insts", action='store_const', const="aaa", help="instruction stats, reqs --stats")
+    argparser.add_argument("--vars", action="store_const", const="aaa", help="most vars stats, reqs --stats")
+    argparser.description = "Interpret for XML generated from IPPcode19"
+    argparser.error = arg_error
     args = argparser.parse_args()
+
     if args.input == None and args.source == None:
         exit(10);
 
@@ -32,7 +46,17 @@ def get_inputs():
     except:
         exit(11)
 
-    return (source_file, input_file)
+    stats_file = None
+    try:
+        if args.stats != None:
+            stats_file = open(args.stats[0], "w")
+    except:
+        exit(12)
+
+    if (args.insts == "aaa" or args.vars == "aaa") and stats_file == None:
+        exit(10)
+
+    return (source_file, input_file, stats_file)
 
 #inits the symbol table
 def init_symbol_table():
@@ -42,14 +66,14 @@ def init_symbol_table():
 #defines label in the symbol table
 def make_label(arguments, location):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     arg_type, var = arguments[0]
 
     if arg_type != "label":
         exit(53)
     if var in symbol_table["label"]:
         exit(52)
-    symbol_table["label"][var] = int(location)
+    symbol_table["label"][var] = int(location) - 1
 
 #returns the code as {'order': ['opcode', [arg1, arg2, ...]], ...},
 #where arg = (type, value)
@@ -94,12 +118,15 @@ def load_code(source_file):
         instructions[order] = list()
 
         #load the arguments for the instruction
+        datatypes = ["string", "int", "var", "float", "nil", "bool", "type", "label"]
         arguments = list()
         try:
             for i in range(len(list(instruction))):
                 xml_arg = instruction.find("arg" + str(i + 1))
                 if len(xml_arg.attrib) != 1:
                     exit(32)
+                if not xml_arg.attrib["type"] in datatypes:
+                    exit(53)
                 if xml_arg.attrib["type"] == "string" and xml_arg.text == None:
                     argument = ("string", "")
                 else:
@@ -114,13 +141,13 @@ def load_code(source_file):
         instructions[order].append(arguments)
     
     if(len(missing) > 0):
-        print(missing)
+        exit(32)
     return instructions
 
 #just checks if the symbol is a valid constant
 def is_const(var_type):
     if var_type == "int" or var_type == "string" or \
-            var_type == "bool" or var_type == "nil":
+            var_type == "bool" or var_type == "nil" or var_type == "float":
         return True
     else:
         return False
@@ -141,7 +168,6 @@ def is_defined(prefix, sufix):
         return 55
 
     if sufix not in symbol_table[prefix]:
-        print("AA")
         return 54
     return 0
 
@@ -159,7 +185,7 @@ def get_symbol(symbol):
 #executes the defvar instruction: DEFVAR var
 def defvar(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
 
     arg_type, var = arguments[0]
     prefix, sufix = process_at(var)
@@ -175,7 +201,7 @@ def defvar(arguments):
 #executes the move instruction: MOVE var symb
 def move(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
 
     dest_type, dest = arguments[0]
     source_type, source = arguments[1]
@@ -203,13 +229,13 @@ def move(arguments):
 #executes the createframe instruction: CREATEFRAME
 def createframe(arguments):
     if len(arguments) != 0:
-        exit(52)
+        exit(32)
     symbol_table["TF"] = dict()
 
 #executes the pushframe instruction: PUHSFRAME
 def pushframe(arguments):
     if len(arguments) != 0:
-        exit(52)
+        exit(32)
     if "TF" not in symbol_table:
         exit(55)
     if "LF" in symbol_table:
@@ -219,7 +245,7 @@ def pushframe(arguments):
 #executes the popframe instruction: POPFRAME
 def popframe(arguments):
     if len(arguments) != 0:
-        exit(52)
+        exit(32)
     if "LF" not in symbol_table:
         exit(55)
     symbol_table["TF"] = symbol_table.pop("LF")
@@ -229,7 +255,7 @@ def popframe(arguments):
 #executes the call instruction: CALL label
 def call(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     arg_type, var = arguments[0]
     if arg_type != "label":
@@ -245,7 +271,7 @@ def call(arguments):
 #executes the return instruction: RETURN
 def return_instruction(arguments):
     if len(arguments) != 0:
-        exit(52)
+        exit(32)
     
     if len(call_stack) == 0:
         exit(56)
@@ -256,7 +282,7 @@ def return_instruction(arguments):
 #executes the pushs instruction: PUSHS symbol
 def pushs(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     var_type, var = arguments[0]
     
@@ -272,7 +298,7 @@ def pushs(arguments):
 #executes the pops instruction: POPS var
 def pops(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     if len(var_stack) == 0:
         exit(56)
@@ -289,10 +315,17 @@ def pops(arguments):
 
     symbol_table[prefix][sufix] = var_stack.pop()
 
+#executes the clears instruction: CLEARS
+def clears(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    var_stack = []
+
 #executes the add instruction: ADD var symb symb
 def add(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -312,15 +345,19 @@ def add(arguments):
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
 
-    if arg1_type != "int" or arg2_type != "int":
+    if arg1_type == "int" and arg2_type == "int":
+        symbol_table[dest_prefix][dest_sufix] = ("int", str(int(arg1) + int(arg2)))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("float", \
+                float(float.fromhex(arg1) + float.fromhex(arg2)).hex())
+    else:
         exit(53)
-
-    symbol_table[dest_prefix][dest_sufix] = ("int", int(arg1) + int(arg2))
 
 #executes the sub instruction: SUB var symb symb
 def sub(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -341,15 +378,19 @@ def sub(arguments):
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
 
-    if arg1_type != "int" or arg2_type != "int":
+    if arg1_type == "int" and arg2_type == "int":
+        symbol_table[dest_prefix][dest_sufix] = ("int", str(int(arg1) - int(arg2)))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("float", \
+                str(float.fromhex(arg1) - float.fromhex(arg2)))
+    else:
         exit(53)
-
-    symbol_table[dest_prefix][dest_sufix] = ("int", int(arg1) - int(arg2))
 
 #executes the mul instruction: MUL var symb symb
 def mul(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -370,15 +411,19 @@ def mul(arguments):
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
 
-    if arg1_type != "int" or arg2_type != "int":
+    if arg1_type == "int" and arg2_type == "int":
+        symbol_table[dest_prefix][dest_sufix] = ("int", str(int(arg1) * int(arg2)))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("float", \
+                str(float.fromhex(arg1) * float.fromhex(arg2)))
+    else:
         exit(53)
-
-    symbol_table[dest_prefix][dest_sufix] = ("int", int(arg1) * int(arg2))
 
 #executes the idiv instruction: IDIV
 def idiv(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -407,10 +452,134 @@ def idiv(arguments):
 
     symbol_table[dest_prefix][dest_sufix] = ("int", int(int(arg1) / int(arg2)))
 
+#executes the adds instruction: ADDS
+def adds(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type == "int" and arg2_type == "int":
+        var_stack.append(("int", str(int(arg1) + int(arg2))))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        var_stack.append(("float", \
+                float(float.fromhex(arg1) + float.fromhex(arg2)).hex()))
+    else:
+        exit(53)
+
+#executes the subs instruction: SUBS
+def subs(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type == "int" and arg2_type == "int":
+        var_stack.append(("int", str(int(arg1) - int(arg2))))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        var_stack.append(("float", \
+                float(float.fromhex(arg1) - float.fromhex(arg2)).hex()))
+    else:
+        exit(53)
+
+#executes the muls instruction: MULS
+def muls(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type == "int" and arg2_type == "int":
+        var_stack.append(("int", str(int(arg1) * int(arg2))))
+    
+    elif arg1_type == "float" and arg2_type == "float":
+        var_stack.append(("float", \
+                float(float.fromhex(arg1) * float.fromhex(arg2)).hex()))
+    else:
+        exit(53)
+
+#executes the idivs instruction: IDIVS
+def idivs(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type != "int" or arg2_type != "int":
+        exit(53)
+
+    if int(arg2) == 0:
+        exit(57)
+
+    var_stack.append(("int", int(int(arg1) / int(arg2))))
+
+#executes the div instruction: DIV
+def div(arguments):
+    if len(arguments) != 3:
+        exit(32)
+    
+    dest_type, dest = arguments[0]
+    arg1_type, arg1 = arguments[1]
+    arg2_type, arg2 = arguments[2]
+
+    dest_prefix, dest_sufix = process_at(dest)
+    
+    if dest_type != "var":
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type != "float" or arg2_type != "float":
+        exit(53)
+
+    if float.fromhex(arg2) == 0:
+        exit(57)
+
+    symbol_table[dest_prefix][dest_sufix] = ("float", \
+            str(float.fromhex(arg1) / float.fromhex(arg2)))
+
 #executes the lt instruction: LT var symb symb
 def lt(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -446,6 +615,9 @@ def lt(arguments):
     
     elif arg1_type == "string":
         symbol_table[dest_prefix][dest_sufix] = ("bool", str(arg1 < arg2).lower())
+
+    elif arg1_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("bool", str(float.fromhex(arg1) < float.fromhex(arg2)).lower())
     
     else:
         exit(53)
@@ -453,7 +625,7 @@ def lt(arguments):
 #executes the gt instruction: GT var symb symb
 def gt(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -489,6 +661,9 @@ def gt(arguments):
     
     elif arg1_type == "string":
         symbol_table[dest_prefix][dest_sufix] = ("bool", str(arg1 > arg2).lower())
+
+    elif arg1_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("bool", str(float.fromhex(arg1) > float.fromhex(arg2)).lower())
     
     else:
         exit(53)
@@ -496,7 +671,7 @@ def gt(arguments):
 #executes the eq instruction: EQ var symb symb
 def eq(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -528,13 +703,121 @@ def eq(arguments):
     
     elif arg1_type == "nil":
         symbol_table[dest_prefix][dest_sufix] = ("bool", "true") 
+
+    elif arg1_type == "float":
+        symbol_table[dest_prefix][dest_sufix] = ("bool", str(float.fromhex(arg1) == float.fromhex(arg2)).lower())
+
+    else:
+        exit(53)
+
+#executes the lts instruction: LTS
+def lts(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type != arg2_type:
+        exit(53)
+
+    if arg1_type == "int":
+        var_stack.append("bool", str(int(arg1) < int(arg2)).lower())
+    
+    elif arg1_type == "bool":
+        if arg1 == "false" and arg2 == "true":
+            var_stack.append("bool", "true")
+        
+        else:
+            var_stack.append("bool", "false")
+    
+    elif arg1_type == "string":
+        var_stack.append("bool", str(arg1 < arg2).lower())
+
+    elif arg1_type == "float":
+        var_stack.append("bool", str(float.fromhex(arg1) < float.fromhex(arg2)).lower())
+    
+    else:
+        exit(53)
+
+#executes the gts instruction: GTS
+def gts(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type != arg2_type:
+        exit(53)
+
+    if arg1_type == "int":
+        var_stack.append("bool", str(int(arg1) > int(arg2)).lower())
+    
+    elif arg1_type == "bool":
+        if arg1 == "true" and arg2 == "false":
+            var_stack.append("bool", "true")
+    
+        else:
+            var_stack.append("bool", "false")
+    
+    elif arg1_type == "string":
+        var_stack.append("bool", str(arg1 > arg2).lower())
+
+    elif arg1_type == "float":
+        var_stack.append("bool", str(float.fromhex(arg1) > float.fromhex(arg2)).lower())
+    
+    else:
+        exit(53)
+
+#executes the eqs instruction: EQS
+def eqs(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+
+    if arg1_type != arg2_type:
+        exit(53)
+
+    if arg1_type == "int":
+        var_stack.append("bool", str(int(arg1) == int(arg2)).lower())
+    
+    elif arg1_type == "string" or arg1_type == "bool":
+        var_stack.append("bool", str(arg1 == arg2).lower())
+    
+    elif arg1_type == "nil":
+        var_stack.append("bool", "true") 
+
+    elif arg1_type == "float":
+        var_stack.append("bool", str(float.fromhex(arg1) == float.fromhex(arg2)).lower())
+
     else:
         exit(53)
 
 #executes the and instruction: AND var symb symb
 def and_instruction(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -567,7 +850,7 @@ def and_instruction(arguments):
 #executes the or instruction: OR var symb symb
 def or_instruction(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -600,7 +883,7 @@ def or_instruction(arguments):
 #executes the not instruction: NOT var symb
 def not_instruction(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -626,10 +909,75 @@ def not_instruction(arguments):
     else:
         symbol_table[dest_prefix][dest_sufix] = ("bool", "true")
 
+#executes the ands instruction: ANDS
+def ands(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+    
+    if arg1_type != "bool" or arg2_type != "bool":
+        exit(53)
+    
+    if arg1 == "true" and arg2 == "true":
+        var_stack.append("bool", "true")
+    
+    else:
+        var_stack.append("bool", "false")
+
+#executes the ors instruction: ORS
+def ors(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+    
+    if arg1_type != "bool" or arg2_type != "bool":
+        exit(53)
+    
+    if arg1 == "true" or arg2 == "true":
+        var_stack.append("bool", "true")
+    
+    else:
+        var_stack.append("bool", "false")
+
+#executes the nots instruction: NOTS
+def nots(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg1_type != "bool":
+        exit(53)
+    
+    if arg1 == "true":
+        var_stack.append("bool", "false")
+    
+    else:
+        var_stack.append("bool", "true")
+
 #executes the int2char instruction: INT2CHAR var symb
 def int2char(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -652,13 +1000,12 @@ def int2char(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("string", chr(int(arg1)))
     except:
-        print("inttochar")
         exit(58)
 
 #executes the stri2int instruction: STRI2INT var symb symb
 def stri2int(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -685,13 +1032,108 @@ def stri2int(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("int", ord(arg1[int(arg2)]))
     except:
-        print("stritoint")
+        exit(58)
+
+#executes the int2chars instruction: INT2CHARS
+def int2chars(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg1_type != "int":
+        exit(53)
+
+    try:
+        var_stack.append("string", chr(int(arg1)))
+    except:
+        exit(58)
+
+#executes the stri2ints instruction: STRI2INTS
+def stri2ints(arguments):
+    if len(arguments) != 0:
+        exit(32)
+    
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+    
+    if arg1_type != "string" or arg2_type != "int":
+        exit(53)
+
+    try:
+        var_stack.append("int", ord(arg1[int(arg2)]))
+    except:
+        exit(58)
+
+#executes the int2float instruction: INT2FOLAT var symb
+def int2float(arguments):
+    if len(arguments) != 2:
+        exit(32)
+    
+    dest_type, dest = arguments[0]
+    arg1_type, arg1 = arguments[1]
+
+    dest_prefix, dest_sufix = process_at(dest)
+    
+    if dest_type != "var":
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg1_type != "int":
+        exit(53)
+
+    try:
+        symbol_table[dest_prefix][dest_sufix] = ("float", float(int(arg1)).hex())
+    except:
+        exit(58)
+
+#executes the float2int instruction: FLOAT2INT var symb
+def float2int(arguments):
+    if len(arguments) != 2:
+        exit(32)
+    
+    dest_type, dest = arguments[0]
+    arg1_type, arg1 = arguments[1]
+
+    dest_prefix, dest_sufix = process_at(dest)
+    
+    if dest_type != "var":
+        exit(32)
+
+    ret_val = is_defined(dest_prefix, dest_sufix)
+    if ret_val != 0:
+        exit(ret_val)
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg1_type != "float":
+        exit(53)
+
+    try:
+        symbol_table[dest_prefix][dest_sufix] = ("int", int(float.fromhex(arg1)))
+    except:
         exit(58)
     
 #executes the read instruction: READ var type
 def read(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -708,7 +1150,11 @@ def read(arguments):
     if arg1_type != "type":
         exit(53)
 
-    value = input()
+    try:
+        value = input()
+    except:
+        value = ""
+
     if arg1 == "int":
         try:
             symbol_table[dest_prefix][dest_sufix] = ("int", str(int(value)))
@@ -727,13 +1173,18 @@ def read(arguments):
                 symbol_table[dest_prefix][dest_sufix] = ("bool", "false")
         except:
             symbol_table[dest_prefix][dest_sufix] = ("bool", "false")
+    elif arg1 == "float":
+        try:
+            symbol_table[dest_prefix][dest_sufix] = ("float", float.fromhex(value).hex())
+        except:
+            symbol_table[dest_prefix][dest_sufix] = ("int", 0)
     else:
         exit(57)
 
 #executes the write instruction: WRITE symb
 def write(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     if dest_type == "var":
@@ -754,7 +1205,7 @@ def write(arguments):
 #executes the concat instruction: CONCAT var symb symb
 def concat(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -783,7 +1234,7 @@ def concat(arguments):
 #executes the strlen instruction: STRLEN var symb
 def strlen(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -808,7 +1259,7 @@ def strlen(arguments):
 #executes the getchar instruction: GETCHAR var symb symb
 def getchar(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -835,13 +1286,12 @@ def getchar(arguments):
     try:
         symbol_table[dest_prefix][dest_sufix] = ("string", arg1[int(arg2)])
     except:
-        print("getchar")
         exit(58)
 
 #executes the setchar instruction: SETCHAR var symb symb
 def setchar(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -868,13 +1318,11 @@ def setchar(arguments):
         exit(53)
 
     if len(arg2) < 1:
-        print("setchar1")
         exit(58)
 
     try:
         dest = dest[:int(arg1)] + arg2[0:1] + dest[int(arg1) + 1:]
     except:
-        print("setchar2")
         exit(58)
 
     symbol_table[dest_prefix][dest_sufix] = ("string", dest)
@@ -886,7 +1334,7 @@ def label(arguments):
 #executes the type instruction: TYPE var symb
 def type_instruction(arguments):
     if len(arguments) != 2:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -916,7 +1364,7 @@ def type_instruction(arguments):
 #executes the jump instruction: JUMP label
 def jump(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     var_type, var = arguments[0]
     
@@ -932,7 +1380,7 @@ def jump(arguments):
 #executes the jumpifeq instruction: JUMPIFEQ label symb symb
 def jumpifeq(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -960,7 +1408,7 @@ def jumpifeq(arguments):
 #executes the jumpifneq instruction: JUMPIFNEQ label symb symb
 def jumpifneq(arguments):
     if len(arguments) != 3:
-        exit(52)
+        exit(32)
     
     dest_type, dest = arguments[0]
     arg1_type, arg1 = arguments[1]
@@ -985,10 +1433,66 @@ def jumpifneq(arguments):
         global instruction_pointer
         instruction_pointer = symbol_table["label"][dest]
 
+#executes the jumpifeqs instruction: JUMPIFEQS label
+def jumpifeqs(arguments):
+    if len(arguments) != 1:
+        exit(32)
+    
+    dest_type, dest = arguments[0]
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if dest_type != "label":
+        exit(32)
+
+    if dest not in symbol_table["label"]:
+        exit(52)
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+    
+    if arg1_type != arg2_type:
+        exit(53)
+
+    if arg1 == arg2:
+        global instruction_pointer
+        instruction_pointer = symbol_table["label"][dest]
+
+#executes the jumpifneqs instruction: JUMPIFNEQS label
+def jumpifneqs(arguments):
+    if len(arguments) != 1:
+        exit(32)
+    
+    dest_type, dest = arguments[0]
+    arg2_type, arg2 = var_stack.pop()
+    arg1_type, arg1 = var_stack.pop()
+
+    if dest_type != "label":
+        exit(32)
+
+    if dest not in symbol_table["label"]:
+        exit(52)
+
+    if arg1_type == "var":
+        arg1_type, arg1 = get_symbol(arg1)
+
+    if arg2_type == "var":
+        arg2_type, arg2 = get_symbol(arg2)
+    
+    if arg1_type != arg2_type:
+        exit(53)
+
+    if arg1 != arg2:
+        global instruction_pointer
+        instruction_pointer = symbol_table["label"][dest]
+
 #executes the exit instruction: EXIT symb
 def exit_instruction(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
     
     var_type, var = arguments[0]
     
@@ -1001,19 +1505,49 @@ def exit_instruction(arguments):
     if int(var) < 0 or int(var) > 49:
         exit(57)
 
+    for arg in sys.argv:
+        if arg == "--insts":
+            stats_file.write(str(instruction_count) + "\n")
+        if arg == "--vars":
+            stats_file.write(str(var_count) + "\n")
+    if stats_file != None:
+        stats_file.close()
+    source_file.close()
+    input_file.close()
+
     exit(int(var))
 
 #executes the dprint instruction, which does nothing: DPRINT
 def dprint(arguments):
     if len(arguments) != 1:
-        exit(52)
+        exit(32)
 
 #executes the break instruction, which does nothing: BREAK
 def break_instruction(arguments):
     pass
+
+def count_variables():
+    count = 0
+    for var in symbol_table["GF"]:
+        if var != None:
+            count = count + 1
+    if "LF" in symbol_table and symbol_table["LF"] != None:
+        for var in symbol_table["LF"]:
+            if var != None:
+                count = count + 1
+    if "TF" in symbol_table and symbol_table["TF"] != None:
+        for var in symbol_table["TF"]:
+            if var != None:
+                count = count + 1
+    return count
     
 def main():
-    source_file, input_file = get_inputs()
+    global instruction_count
+    global var_count
+    global source_file
+    global input_file
+    global stats_file
+    source_file, input_file, stats_file = get_inputs()
     init_symbol_table()
     global instruction_pointer
     try:
@@ -1024,6 +1558,10 @@ def main():
     lang_keywords = ["return", "and", "or", "not", "type", "break", "exit"]
     while instruction_pointer <= len(program):
         instruction = program[str(instruction_pointer)]
+
+        if stats_file != None:
+            instruction_count = instruction_count + 1
+
         if instruction[0] not in lang_keywords and instruction[0] not in globals():
             exit(32)
         if instruction[0] in lang_keywords:
@@ -1031,11 +1569,17 @@ def main():
         else:
             globals()[instruction[0]](instruction[1])
         instruction_pointer = instruction_pointer + 1
+        
+        if stats_file != None:
+            var_count = max(var_count, count_variables())
 
-    #xml = tree.parse(sys.stdin)
-    #for child in xml.getroot():
-    #    for cc in child:
-    #        print(cc)
+    for arg in sys.argv:
+        if arg == "--insts":
+            stats_file.write(str(instruction_count) + "\n")
+        if arg == "--vars":
+            stats_file.write(str(var_count) + "\n")
+    if stats_file != None:
+        stats_file.close()
     source_file.close()
     input_file.close()
 

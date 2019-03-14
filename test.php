@@ -130,9 +130,17 @@ function help($argc)
 {
 	if($argc != 2)
 		exit(10);
-	print "Script typu filtr nacte ze standardniho vstup zdrojovy kod v IPPcode19, ".
-		"zkontroluje lexikalni a syntaktickou spravnost kodu a vypise na " .
-		"na standardni vystup XML reprezentaci programu dle specifikace.\n";
+	print 
+"Script for testing the parse.php and interpret.py
+
+Usage:
+--help                 prints this help
+--directory=path       directory to look for tests in
+--recursive            tries to search for tests recursively
+--parse-script=file    path to parser script
+--int-script=file      path to interpreter script
+--parse-only           test only parser
+--int-only             test only interpreter";
 	exit(0);
 }
 
@@ -192,10 +200,18 @@ if(array_key_exists("int-script", $options))
 $parse = true;
 $interpret = true;
 if(array_key_exists("parse-only", $options))
+{
 	$interpret = false;
+	if(array_key_exists("int-script", $options) || array_key_exists("int-only", $options))
+		exit(10);
+}
 
 if(array_key_exists("int-only", $options))
+{
 	$parse = false;
+	if(array_key_exists("parse-script", $options) || array_key_exists("parse-only", $options))
+		exit(10);
+}
 
 //get all the test filenames
 $files = getFiles($directory, $recursive);

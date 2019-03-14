@@ -155,9 +155,15 @@ function help($argc)
 {
 	if($argc != 2)
 		exit(10);
-	print "Script typu filtr nacte ze standardniho vstup zdrojovy kod v IPPcode19, ".
-		"zkontroluje lexikalni a syntaktickou spravnost kodu a vypise na " .
-		"na standardni vystup XML reprezentaci programu dle specifikace.\n";
+	print 
+"Parses IPPcode19 from stdin and outputs XML to stdout\n
+Usage:
+--stats File   prints stats
+--loc          prints line of code count to stats file
+--comments     counts comments and prints the result to stats file
+--labels       counts labels and prints the result to stats file
+--jumps        counts jumps and prints the result to stats file
+--help         prints this help\n";
 	exit(0);
 }
 
@@ -184,6 +190,12 @@ if(array_key_exists("help", $options))
 if(in_array("--stats", $argv) && !array_key_exists("stats", $options))
 	exit(10); //missing file
 
+if(!array_key_exists("stats", $options) && 
+	(array_key_exists("loc", $options) ||
+	 array_key_exists("comments", $options) ||
+	 array_key_exists("labels", $options) ||
+ 	 array_key_exists("jumps", $options)))
+	exit(10); //missing --stats
 $scanner = new LexicalAnalyser();
 XMLize($scanner);
 
