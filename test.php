@@ -224,18 +224,23 @@ for($i = 0; $i < sizeof($tests); $i++)
 {
 	$command = "";
 	$output = array();
+	$output["rc"] = 0;
 	if($parse)
-		$command = "php7.3 " . $parser . " < " . $tests[$i]["src"];
-	if($parse && $interpret)
+	{
+		$command = "php7.3 " . $parser . " < '" . $tests[$i]["src"] . "'";
+		exec($command, $output["out"], $output["rc"]);
+		$output["out"] = substr(array_reduce($output["out"], "arrayToStr"), 0, -1);
+	}
+	if($parse && $interpret && $output["rc"] == 0)
 		$command .= " | ";
-	if($interpret)
+	if($interpret && $output["rc"] == 0)
 	{
 		$in = ($tests[$i]["in"] == "") ? $tests[$i]["src"] : $tests[$i]["in"];
-		$command .= "python3.6 " . $interpreter . " --input=" . $in;
+		$command .= "python3.6 " . $interpreter . " --input='" . $in . "'";
 	}
 	if($interpret && !$parse)
 	{
-		$command .= " < " . $tests[$i]["src"];
+		$command .= " < '" . $tests[$i]["src"] . "'";
 	}
 	exec($command, $output["out"], $output["rc"]);
 	$output["out"] = substr(array_reduce($output["out"], "arrayToStr"), 0, -1);
@@ -252,7 +257,7 @@ for($i = 0; $i < sizeof($tests); $i++)
 		}
 		else
 		{
-			exec("printf '" . $output["out"] . "' | diff " . $tests[$i]["out"] . " -", $output["diff"]);
+			exec("echo -n '" . $output["out"] . "' | diff '" . $tests[$i]["out"] . "' -", $output["diff"]);
 			$output["diff"] = array_reduce($output["diff"], "arrayToStr");
 		}
 	}
@@ -273,7 +278,7 @@ for($i = 0; $i < sizeof($tests); $i++)
 				exit(12);
 			fwrite($file, $output["out"]);
 			fclose($file);
-			exec("/bin/bash -c \"java -jar /pub/courses/ipp/jexamxml/jexamxml.jar " . $tests[$i]["out"] . " tmp.out diffs.xml /D /pub/courses/ipp/jexamxml/options\"", $jout, $jrc);
+			exec("/bin/bash -c \"java -jar /pub/courses/ipp/jexamxml/jexamxml.jar '" . $tests[$i]["out"] . "' tmp.out diffs.xml /D /pub/courses/ipp/jexamxml/options\"", $jout, $jrc);
 			unlink("tmp.out");
 			if($jrc != 0)
 			{

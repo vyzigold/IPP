@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as tree
 import argparse
 import sys
+import re
 
 symbol_table = dict()
 frame_stack = list()
@@ -123,15 +124,25 @@ def load_code(source_file):
         try:
             for i in range(len(list(instruction))):
                 xml_arg = instruction.find("arg" + str(i + 1))
+                if xml_arg.find("*") != None:
+                    exit(32)
                 if len(xml_arg.attrib) != 1:
                     exit(32)
                 if not xml_arg.attrib["type"] in datatypes:
                     exit(53)
+                forbiden_chars = ["#", "\n", " ", "\t", "\v", "\f", "\r"]
+                if xml_arg.attrib["type"] == "string" and xml_arg.text != None and \
+                        any(sub_s in xml_arg.text for sub_s in forbiden_chars):
+                    exit(32)
+                if xml_arg.attrib["type"] == "string" and xml_arg.text != None:
+                   xml_arg.text = unescape(xml_arg.text)
                 if xml_arg.attrib["type"] == "string" and xml_arg.text == None:
                     argument = ("string", "")
                 else:
                     argument = (xml_arg.attrib["type"], xml_arg.text)
                 arguments.append(argument)
+                if(xml_arg.tail and xml_arg.tail.strip() != ""):
+                    exit(32)
         except:
             exit(32)
 
@@ -139,6 +150,21 @@ def load_code(source_file):
             make_label(arguments, order)
         instructions[order].append(opcode)
         instructions[order].append(arguments)
+        #if(instruction.tail.strip() != ""):
+        #    exit(32)
+        if(instruction.tail and instruction.tail.strip() != ""):
+            exit(32)
+        if(instruction.text and instruction.text.strip() != ""):
+            exit(32)
+
+    #print(xml_program.tail)
+    #print(xml_program.text)
+    #if(xml_program.)
+    #print(xml_program.tail.strip())
+    if(xml_program.tail and xml_program.tail.strip() != ""):
+        exit(32)
+    if(xml_program.text and xml_program.text.strip() != ""):
+        exit(32)
     
     if(len(missing) > 0):
         exit(32)
@@ -320,7 +346,7 @@ def clears(arguments):
     if len(arguments) != 0:
         exit(32)
     
-    var_stack = []
+    var_stack.clear()
 
 #executes the add instruction: ADD var symb symb
 def add(arguments):
@@ -383,7 +409,7 @@ def sub(arguments):
     
     elif arg1_type == "float" and arg2_type == "float":
         symbol_table[dest_prefix][dest_sufix] = ("float", \
-                str(float.fromhex(arg1) - float.fromhex(arg2)))
+                float(float.fromhex(arg1) - float.fromhex(arg2)).hex())
     else:
         exit(53)
 
@@ -416,7 +442,7 @@ def mul(arguments):
     
     elif arg1_type == "float" and arg2_type == "float":
         symbol_table[dest_prefix][dest_sufix] = ("float", \
-                str(float.fromhex(arg1) * float.fromhex(arg2)))
+                str(float(float.fromhex(arg1) * float.fromhex(arg2)).hex()))
     else:
         exit(53)
 
@@ -450,7 +476,7 @@ def idiv(arguments):
     if int(arg2) == 0:
         exit(57)
 
-    symbol_table[dest_prefix][dest_sufix] = ("int", int(int(arg1) / int(arg2)))
+    symbol_table[dest_prefix][dest_sufix] = ("int", int(int(arg1) // int(arg2)))
 
 #executes the adds instruction: ADDS
 def adds(arguments):
@@ -541,7 +567,7 @@ def idivs(arguments):
     if int(arg2) == 0:
         exit(57)
 
-    var_stack.append(("int", int(int(arg1) / int(arg2))))
+    var_stack.append(("int", int(int(arg1) // int(arg2))))
 
 #executes the div instruction: DIV
 def div(arguments):
@@ -574,7 +600,7 @@ def div(arguments):
         exit(57)
 
     symbol_table[dest_prefix][dest_sufix] = ("float", \
-            str(float.fromhex(arg1) / float.fromhex(arg2)))
+            float(float.fromhex(arg1) / float.fromhex(arg2)).hex())
 
 #executes the lt instruction: LT var symb symb
 def lt(arguments):
@@ -692,6 +718,10 @@ def eq(arguments):
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
 
+    if arg1_type == "nil" or arg2_type == "nil":
+        symbol_table[dest_prefix][dest_sufix] = ("bool", str(arg1_type == arg2_type).lower())
+        return
+
     if arg1_type != arg2_type:
         exit(53)
 
@@ -728,20 +758,20 @@ def lts(arguments):
         exit(53)
 
     if arg1_type == "int":
-        var_stack.append("bool", str(int(arg1) < int(arg2)).lower())
+        var_stack.append(("bool", str(int(arg1) < int(arg2)).lower()))
     
     elif arg1_type == "bool":
         if arg1 == "false" and arg2 == "true":
-            var_stack.append("bool", "true")
+            var_stack.append(("bool", "true"))
         
         else:
-            var_stack.append("bool", "false")
+            var_stack.append(("bool", "false"))
     
     elif arg1_type == "string":
-        var_stack.append("bool", str(arg1 < arg2).lower())
+        var_stack.append(("bool", str(arg1 < arg2).lower()))
 
     elif arg1_type == "float":
-        var_stack.append("bool", str(float.fromhex(arg1) < float.fromhex(arg2)).lower())
+        var_stack.append(("bool", str(float.fromhex(arg1) < float.fromhex(arg2)).lower()))
     
     else:
         exit(53)
@@ -764,20 +794,20 @@ def gts(arguments):
         exit(53)
 
     if arg1_type == "int":
-        var_stack.append("bool", str(int(arg1) > int(arg2)).lower())
+        var_stack.append(("bool", str(int(arg1) > int(arg2)).lower()))
     
     elif arg1_type == "bool":
         if arg1 == "true" and arg2 == "false":
-            var_stack.append("bool", "true")
+            var_stack.append(("bool", "true"))
     
         else:
-            var_stack.append("bool", "false")
+            var_stack.append(("bool", "false"))
     
     elif arg1_type == "string":
-        var_stack.append("bool", str(arg1 > arg2).lower())
+        var_stack.append(("bool", str(arg1 > arg2).lower()))
 
     elif arg1_type == "float":
-        var_stack.append("bool", str(float.fromhex(arg1) > float.fromhex(arg2)).lower())
+        var_stack.append(("bool", str(float.fromhex(arg1) > float.fromhex(arg2)).lower()))
     
     else:
         exit(53)
@@ -796,20 +826,24 @@ def eqs(arguments):
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
 
+    if arg1_type == "nil" or arg2_type == "nil":
+        var_stack.append(("bool", str(arg1_type == arg2_type).lower()))
+        return
+
     if arg1_type != arg2_type:
         exit(53)
 
     if arg1_type == "int":
-        var_stack.append("bool", str(int(arg1) == int(arg2)).lower())
+        var_stack.append(("bool", str(int(arg1) == int(arg2)).lower()))
     
     elif arg1_type == "string" or arg1_type == "bool":
-        var_stack.append("bool", str(arg1 == arg2).lower())
+        var_stack.append(("bool", str(arg1 == arg2).lower()))
     
     elif arg1_type == "nil":
-        var_stack.append("bool", "true") 
+        var_stack.append(("bool", "true") )
 
     elif arg1_type == "float":
-        var_stack.append("bool", str(float.fromhex(arg1) == float.fromhex(arg2)).lower())
+        var_stack.append(("bool", str(float.fromhex(arg1) == float.fromhex(arg2)).lower()))
 
     else:
         exit(53)
@@ -927,10 +961,10 @@ def ands(arguments):
         exit(53)
     
     if arg1 == "true" and arg2 == "true":
-        var_stack.append("bool", "true")
+        var_stack.append(("bool", "true"))
     
     else:
-        var_stack.append("bool", "false")
+        var_stack.append(("bool", "false"))
 
 #executes the ors instruction: ORS
 def ors(arguments):
@@ -950,10 +984,10 @@ def ors(arguments):
         exit(53)
     
     if arg1 == "true" or arg2 == "true":
-        var_stack.append("bool", "true")
+        var_stack.append(("bool", "true"))
     
     else:
-        var_stack.append("bool", "false")
+        var_stack.append(("bool", "false"))
 
 #executes the nots instruction: NOTS
 def nots(arguments):
@@ -969,10 +1003,10 @@ def nots(arguments):
         exit(53)
     
     if arg1 == "true":
-        var_stack.append("bool", "false")
+        var_stack.append(("bool", "false"))
     
     else:
-        var_stack.append("bool", "true")
+        var_stack.append(("bool", "true"))
 
 #executes the int2char instruction: INT2CHAR var symb
 def int2char(arguments):
@@ -1028,7 +1062,6 @@ def stri2int(arguments):
     
     if arg1_type != "string" or arg2_type != "int":
         exit(53)
-
     try:
         symbol_table[dest_prefix][dest_sufix] = ("int", ord(arg1[int(arg2)]))
     except:
@@ -1048,7 +1081,7 @@ def int2chars(arguments):
         exit(53)
 
     try:
-        var_stack.append("string", chr(int(arg1)))
+        var_stack.append(("string", chr(int(arg1))))
     except:
         exit(58)
 
@@ -1070,7 +1103,7 @@ def stri2ints(arguments):
         exit(53)
 
     try:
-        var_stack.append("int", ord(arg1[int(arg2)]))
+        var_stack.append(("int", ord(arg1[int(arg2)])))
     except:
         exit(58)
 
@@ -1177,9 +1210,19 @@ def read(arguments):
         try:
             symbol_table[dest_prefix][dest_sufix] = ("float", float.fromhex(value).hex())
         except:
-            symbol_table[dest_prefix][dest_sufix] = ("int", 0)
+            symbol_table[dest_prefix][dest_sufix] = ("float", 0)
+    elif arg1 == "nil":
+        exit(32)
     else:
         exit(57)
+
+def unescape(string):
+    for i, sub in enumerate(string.split("\\")):
+        if i == 0:
+            string = sub
+        else:
+            string = string + chr(int(sub[0:3])) + sub[3:]
+    return string
 
 #executes the write instruction: WRITE symb
 def write(arguments):
@@ -1192,15 +1235,16 @@ def write(arguments):
             exit(56)
         dest_type, dest = get_symbol(dest)
     
-    #replace escape sequences
-    if dest_type == "string":
-        substrings = dest.split("\\")
-        for i, sub in enumerate(substrings):
-            if i == 0:
-                dest = sub
-            else:
-                dest = dest + chr(int(sub[0:3])) + sub[3:]
-    print(dest, end='')
+    if dest_type == "nil":
+        print("", end='')
+    else:
+        if dest_type == "float":
+            try:
+                print(str(float.fromhex(dest).hex()), end='')
+            except:
+                print(float(dest).hex(), end='')
+        else:
+            print(dest, end='')
     
 #executes the concat instruction: CONCAT var symb symb
 def concat(arguments):
@@ -1320,6 +1364,9 @@ def setchar(arguments):
     if len(arg2) < 1:
         exit(58)
 
+    if int(arg1) >= len(arg2) or int(arg1) < 0:
+        exit(58)
+
     try:
         dest = dest[:int(arg1)] + arg2[0:1] + dest[int(arg1) + 1:]
     except:
@@ -1407,6 +1454,7 @@ def jumpifeq(arguments):
 
 #executes the jumpifneq instruction: JUMPIFNEQ label symb symb
 def jumpifneq(arguments):
+    global instruction_pointer
     if len(arguments) != 3:
         exit(32)
     
@@ -1425,12 +1473,11 @@ def jumpifneq(arguments):
 
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
-    
+
     if arg1_type != arg2_type:
         exit(53)
 
     if arg1 != arg2:
-        global instruction_pointer
         instruction_pointer = symbol_table["label"][dest]
 
 #executes the jumpifeqs instruction: JUMPIFEQS label
@@ -1453,7 +1500,7 @@ def jumpifeqs(arguments):
 
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
-    
+
     if arg1_type != arg2_type:
         exit(53)
 
@@ -1463,6 +1510,7 @@ def jumpifeqs(arguments):
 
 #executes the jumpifneqs instruction: JUMPIFNEQS label
 def jumpifneqs(arguments):
+    global instruction_pointer
     if len(arguments) != 1:
         exit(32)
     
@@ -1481,12 +1529,11 @@ def jumpifneqs(arguments):
 
     if arg2_type == "var":
         arg2_type, arg2 = get_symbol(arg2)
-    
+
     if arg1_type != arg2_type:
         exit(53)
 
     if arg1 != arg2:
-        global instruction_pointer
         instruction_pointer = symbol_table["label"][dest]
 
 #executes the exit instruction: EXIT symb
