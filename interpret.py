@@ -1586,6 +1586,11 @@ def count_variables():
         for var in symbol_table["TF"]:
             if var != None:
                 count = count + 1
+    if var_stack != None:
+        for frame in var_stack:
+            for var in frame:
+                if var != None:
+                    count = count + 1
     return count
     
 def main():
